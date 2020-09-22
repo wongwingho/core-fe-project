@@ -208,6 +208,25 @@ describe("useBinaryAction(type test)", () => {
         // @ts-expect-error
         useBinaryAction(oneArgAction);
     });
+    test("Should not transform action creator return type", () => {
+        const actionWithOptionalArg: ActionCreator<[arg?: number]> = (arg) => ({type: "test", payload: [arg]});
+
+        const update = useUnaryAction(actionWithOptionalArg);
+        update(2);
+
+        // @ts-expect-error
+        update({key: ""});
+
+        const actionWithOptionalObjectArg: ActionCreator<[arg?: Partial<{a: string; b: number}>]> = (arg) => ({type: "test", payload: [arg]});
+        const updateObject = useUnaryAction(actionWithOptionalObjectArg);
+        updateObject({a: "partal"});
+        updateObject({b: 1});
+
+        // @ts-expect-error
+        updateObject("should not accept");
+
+        updateObject(undefined);
+    });
 });
 
 describe("useModuleObjectKeyAction(type test)", () => {

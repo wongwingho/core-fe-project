@@ -4,6 +4,14 @@ import {useDispatch, useSelector} from "react-redux";
 
 type DeferLiteralArrayCheck<T> = T extends Array<string | number | boolean | null | undefined> ? T : never;
 
+type DropLast<T extends any[]> = T extends [...infer I, infer L] ? I : never;
+
+type ActionCreator<P extends any[]> = (...args: P) => Action<P>;
+
+type Last<T extends readonly unknown[]> = T extends readonly [...infer _, infer U] ? U : T extends readonly [...infer _, (infer U)?] ? U | undefined : undefined;
+
+export type Length<T extends any[]> = T["length"];
+
 export function useLoadingStatus(identifier: string = "global"): boolean {
     return useSelector((state: State) => state.loading[identifier] > 0);
 }
@@ -24,9 +32,10 @@ export function useAction<P extends Array<string | number | boolean | null | und
  * useUnaryAction(foo, 100, "") will return:
  * (c: boolean) => void;
  */
-export function useUnaryAction<P extends any[], U>(actionCreator: (...args: [...P, U]) => Action<[...DeferLiteralArrayCheck<P>, U]>, ...deps: P): (arg: U) => void {
+export function useUnaryAction<P extends any[]>(actionCreator: Length<P> extends 0 ? never : ActionCreator<P>, ...deps: DeferLiteralArrayCheck<DropLast<P>>): (arg: Last<P>) => void {
     const dispatch = useDispatch();
-    return React.useCallback((arg: U) => dispatch(actionCreator(...deps, arg)), deps);
+    // Need to cast back to P as deps could conditionally be never
+    return React.useCallback((arg: Last<P>) => dispatch(actionCreator(...([...deps, arg] as P))), deps);
 }
 
 /**
@@ -36,9 +45,9 @@ export function useUnaryAction<P extends any[], U>(actionCreator: (...args: [...
  * useBinaryAction(foo, 100) will return:
  * (b: string, c: boolean) => void;
  */
-export function useBinaryAction<P extends any[], U, K>(actionCreator: (...args: [...P, U, K]) => Action<[...DeferLiteralArrayCheck<P>, U, K]>, ...deps: P): (arg1: U, arg2: K) => void {
+export function useBinaryAction<P extends any[]>(actionCreator: Length<P> extends 0 ? never : Length<P> extends 1 ? never : ActionCreator<P>, ...deps: DeferLiteralArrayCheck<DropLast<DropLast<P>>>): (arg1: Last<DropLast<P>>, arg2: Last<P>) => void {
     const dispatch = useDispatch();
-    return React.useCallback((arg1: U, arg2: K) => dispatch(actionCreator(...deps, arg1, arg2)), deps);
+    return React.useCallback((arg1: Last<DropLast<P>>, arg2: Last<P>) => dispatch(actionCreator(...([...deps, arg1, arg2] as P))), deps);
 }
 
 /**
@@ -48,7 +57,7 @@ export function useBinaryAction<P extends any[], U, K>(actionCreator: (...args: 
  * useModuleObjectAction(foo, "key") will return:
  * (objectValue: number) => void;
  */
-export function useObjectKeyAction<T extends object, K extends keyof T>(actionCreator: (arg: T) => Action<[T]>, objectKey: K): (objectValue: T[K]) => void {
+export function useObjectKeyAction<T extends object, K extends keyof T>(actionCreator: ActionCreator<[T]>, objectKey: K): (objectValue: T[K]) => void {
     const dispatch = useDispatch();
     return React.useCallback((objectValue: T[K]) => dispatch(actionCreator({[objectKey]: objectValue} as T)), [dispatch, actionCreator, objectKey]);
 }
